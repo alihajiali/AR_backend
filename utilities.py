@@ -3,6 +3,7 @@ from uuid import uuid4
 from env import *
 import requests
 import hashlib
+import pickle
 import jwt
 
 
@@ -45,9 +46,15 @@ def jwt_checker(token):
     data = jwt.decode(token.encode(), DJANGO_SECRET_KEY, algorithms=["HS256"])
     return data
 
-print(jwt_generator("username"))
 
 def Auth(jwt_json):
     if datetime.now().isoformat() < jwt_json["expire"]:
         return True
     return False
+
+
+def dumper(file):
+    return pickle.dumps(file)
+
+def loader(pk):
+    return pickle.loads(pk)
