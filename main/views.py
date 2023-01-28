@@ -1,4 +1,3 @@
-from curses.ascii import isdigit
 from pydoc import doc
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -12,11 +11,11 @@ class User(APIView):
         query = {"match_all":{}}
         if username is not None:
             query = {"match":{"username":username}}
-        user_count = es.count(index="user_2", body={"query":query})["count"]
+        user_count = es.count(index="user_1", body={"query":query})["count"]
         pages = user_count // size
         if user_count % size != 0:
             pages += 1
-        users = es.search(index="user_2", query=query, size=size, from_=(page-1)*size)["hits"]["hits"]
+        users = es.search(index="user_1", query=query, size=size, from_=(page-1)*size)["hits"]["hits"]
         return {"users":users, "total_record":user_count, "pages":pages}, HTTP_200_OK
 
     def get(self, request):
@@ -33,9 +32,9 @@ class User(APIView):
         self.password = password
         self.username = username
         self.phone_number = phone_number
-        if es.count(index="user_2", body={"query":{"match":{"username.keyword":self.username}}})["count"] == 0:
-            if es.count(index="user_2", body={"query":{"match":{"email.keyword":self.email}}})["count"] == 0:
-                if es.count(index="user_2", body={"query":{"match":{"phone_number.keyword":self.phone_number}}})["count"] == 0:
+        if es.count(index="user_1", body={"query":{"match":{"username.keyword":self.username}}})["count"] == 0:
+            if es.count(index="user_1", body={"query":{"match":{"email.keyword":self.email}}})["count"] == 0:
+                if es.count(index="user_1", body={"query":{"match":{"phone_number.keyword":self.phone_number}}})["count"] == 0:
                     if self.username not in ["admin", "user", "modir"]:
                         if "@gmail.com" in self.email:
                             if self.phone_number[:2] == "09" and self.phone_number[2:].isdigit() and len(self.phone_number) == 11:
@@ -47,7 +46,7 @@ class User(APIView):
                                         "phone_number": self.phone_number, 
                                         "status":"inactive"
                                     }
-                                    es.index(index="user_2", id=self.username, document=self.data)
+                                    es.index(index="user_1", id=self.username, document=self.data)
                                     return ({"message":"registered"}, HTTP_201_CREATED)
                                 return ({"message":"password does not valid"}, HTTP_406_NOT_ACCEPTABLE)
                             return ({"message":"phone number does not valid"}, HTTP_406_NOT_ACCEPTABLE)
@@ -71,13 +70,13 @@ class ActivePhoneNumver(APIView):
     def get(self, request):
         data = request.GET
         if check_code(data["username"], data["code"]):
-            es.update(index="user_2", id=data["username"], doc={"status":"active"})
+            es.update(index="user_1", id=data["username"], doc={"status":"active"})
             return Response({"message":"user activate"}, status=HTTP_200_OK)
         return Response({"message":"code is wrong"}, status=HTTP_400_BAD_REQUEST)
 
     def post(self, request):
         username = request.data["username"]
-        user_data = es.get(index="user_2", id=username)
+        user_data = es.get(index="user_1", id=username)
         if user_data["_source"]["status"] == "inactive": 
             phone_number = user_data["_source"]["phone_number"]
             code = generate_code(username)
@@ -101,13 +100,13 @@ class UpdateUser(APIView):
                 user_data["email"] = data["email"]
             if "new_password" in data:
                 user_data["password"] = hash_saz(data["new_password"])
-            es.update(index="user_2", id=data["username"], doc=user_data)
+            es.update(index="user_1", id=data["username"], doc=user_data)
             return Response({"message":"user updated"}, status=HTTP_200_OK)
         return Response({"message":"code is wrong"}, status=HTTP_400_BAD_REQUEST)
 
     def post(self, request):
         username = request.data["username"]
-        user_data = es.get(index="user_2", id=username)
+        user_data = es.get(index="user_1", id=username)
         phone_number = user_data["_source"]["phone_number"]
         code = generate_code(username)
         if code:
@@ -120,13 +119,13 @@ class DeleteUser(APIView):
     def get(self, request):
         data = request.GET
         if check_code(data["username"], data["code"]):
-            es.delete(index="user_2", id=data["username"])
+            es.delete(index="user_1", id=data["username"])
             return Response({"message":"user deleted"}, status=HTTP_200_OK)
         return Response({"message":"code is wrong"}, status=HTTP_400_BAD_REQUEST)
 
     def post(self, request):
         username = request.data["username"]
-        user_data = es.get(index="user_2", id=username)
+        user_data = es.get(index="user_1", id=username)
         if user_data["_source"]["status"] == "inactive": 
             phone_number = user_data["_source"]["phone_number"]
             code = generate_code(username)
@@ -140,7 +139,7 @@ class DeleteUser(APIView):
 class Login(APIView):
     def post(self, request):
         data = request.data
-        user_data = es.search(index="user_2", query={"match":{"username.keyword":data["username"]}})["hits"]["hits"]
+        user_data = es.search(index="user_1", query={"match":{"username.keyword":data["username"]}})["hits"]["hits"]
         if user_data:
             if user_data[0]["_source"]["password"] == hash_saz(data["password"]):
                 access = jwt_generator(data["username"])
@@ -155,7 +154,7 @@ class GetCategory(APIView):
         if Auth(jwt_checker(request.headers["Authorization"].split(" ")[1])):
             agg = {
                 "size": 0, 
-                "aggs": {"find_category": {"terms": {"field": "category","size": 1000}}}
+                "aggs": {"find_category": {"terms": {"field": "category.keyword","size": 1000}}}
             }
             response = [item["key"] for item in es.search(index="ar_model", body=agg)["aggregations"]["find_category"]["buckets"]]
             return Response(response, status=HTTP_200_OK)
@@ -175,12 +174,12 @@ class AR_Model(APIView):
 
     def post(self, request):
         if Auth(jwt_checker(request.headers["Authorization"].split(" ")[1])):
-            file = request.files
+            file = request.data["file"]
             data = request.data
             result = {
                 "category":data["category"], 
                 "name":data["name"], 
-                "file":dumper(file)
+                "file":str(dumper(file))
             }
             es.index(index="ar_model", document=result)
             return Response({"message":"data added"}, status=HTTP_201_CREATED)

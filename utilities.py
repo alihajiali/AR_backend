@@ -9,7 +9,7 @@ import jwt
 
 
 def hash_saz(matn):
-    return hashlib.sha256(str.encode()).hexdigest()
+    return hashlib.sha256(str(matn).encode()).hexdigest()
 
 
 
@@ -38,9 +38,9 @@ def check_code(username, code):
 
 
 def jwt_generator(username):
-    expire = (datetime.now() + timedelta(minutes=1)).isoformat()
+    expire = (datetime.now() + timedelta(minutes=1000)).isoformat()
     token = jwt.encode({"username":username, "expire":expire}, DJANGO_SECRET_KEY, algorithm="HS256")
-    return token.decode()
+    return token
 
 def jwt_checker(token):
     data = jwt.decode(token.encode(), DJANGO_SECRET_KEY, algorithms=["HS256"])
