@@ -46,7 +46,7 @@ class User(APIView):
                                         "phone_number": self.phone_number, 
                                         "status":"inactive"
                                     }
-                                    es.index(index="user_1", id=self.username, document=self.data)
+                                    es.index(index="user_1", document=self.data)
                                     return ({"message":"registered"}, HTTP_201_CREATED)
                                 return ({"message":"password does not valid"}, HTTP_406_NOT_ACCEPTABLE)
                             return ({"message":"phone number does not valid"}, HTTP_406_NOT_ACCEPTABLE)
