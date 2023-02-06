@@ -11,4 +11,5 @@ urlpatterns = [
     path('login/', Login.as_view()), 
     path('get_category/', GetCategory.as_view()), 
     path('ar_model/', AR_Model.as_view()), 
+    path('model/', MODEL.as_view()), 
 ]

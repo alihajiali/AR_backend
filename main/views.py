@@ -187,3 +187,10 @@ class AR_Model(APIView):
             es.index(index="ar_model", document=result)
             return Response({"message":"data added"}, status=HTTP_201_CREATED)
         return Response({"message":"user is not Autorize"}, status=HTTP_401_UNAUTHORIZED)
+
+
+class MODEL(APIView):
+    def get(self, request):
+        with open("model2.txt", "r") as file:
+            response = file.read()
+        return Response(response)
